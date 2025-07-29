@@ -1,0 +1,52 @@
+# Python相關
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 虛擬環境
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# IDE相關
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# 系統檔案
+.DS_Store
+Thumbs.db
+
+# 日誌檔案
+*.log
+
+# dotenv 環境變數檔案
+.env
+
+# pip wheel 檔案
+*.whl
+
+# pytest cache
+.pytest_cache/
+
+# mypy cache
+.mypy_cache/
+
+# coverage report
+htmlcov/
+.coverage
+
+# SQLite 資料庫檔案 (如果你用的話)
+*.sqlite3
+
+# bytecode
+*.pyc
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Docker相關 (如果有)
+docker-compose.override.yml
