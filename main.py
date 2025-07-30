@@ -6,9 +6,9 @@ import json
 from typing import List
 import asyncio
 
-
+from utils import security
 from routers import user_router
-from models.user import UserRegister
+from models.user import UserRegister , UserLogin
 
 app = FastAPI()
 
@@ -24,7 +24,6 @@ app.add_middleware(
 #預設首頁
 @app.get("/")
 async def fun():
-    user_router.print_all_users()
     return JSONResponse(
         {
             'hello':'hello world'
@@ -33,18 +32,41 @@ async def fun():
 
 
 @app.post("/register")
-async def register(name: str = Form(...),email: str = Form(...),password: str = Form(...)):
-    user = UserRegister(name=name, email=email, password=password)
-    result = user_router.register(user)
+async def register(register_data: UserRegister):
+    result = user_router.register(register_data)
 
     if result["success"]:
         return JSONResponse(status_code=200, content=result)
     else:
         return JSONResponse(status_code=400, content=result)
 
+@app.post("/login")
+async def login(login_data: UserLogin):
+    result = user_router.login(login_data)
+    if result["success"]:
+        return JSONResponse(status_code=200, content=result)
+    else:
+        return JSONResponse(status_code=400, content=result)
 
 
+@app.get("/user")
+async def user(authorization: str = Header(None)):
+    if authorization is None or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid or missing token")
+    
+    token = authorization[7:]  # 去掉 "Bearer "
+    payload = security.verify_jwt(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    return {
+        "user_id": payload["user_id"],
+        "username": payload["username"],
+        "email": payload["email"],
+    }
 
+
+    
 if __name__ == "__main__":  
     uvicorn.run("main:app", host="0.0.0.0", port=3000, reload=True)
 
