@@ -1,6 +1,6 @@
 from database import get_db_connection
 from utils import security
-from models.user import UserRegister , UserLogin
+from models.user import UserRegister , UserLogin , UserUpdate
 import pymysql
 
 def print_all_users():
@@ -12,7 +12,7 @@ def print_all_users():
                 print(row)
 
 
-def register(register_data: UserRegister):
+def register(register_data: UserRegister) -> dict :
     hashed_password = security.hash_password(register_data.password)
 
     try:
@@ -69,7 +69,7 @@ def register(register_data: UserRegister):
             "data": None
         }
 
-def login(login_data: UserLogin):
+def login(login_data: UserLogin) -> dict :
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
@@ -111,5 +111,83 @@ def login(login_data: UserLogin):
         return {
             "success": False,
             "message": "Database error.",
+            "data": None
+        }
+
+
+def update(payload: dict, update_data: UserUpdate) -> dict:
+    user_id = payload.get("user_id")
+    if not user_id:
+        return {
+            "success": False,
+            "message": "Missing user ID.",
+            "data": None
+        }
+
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                # 查詢目前的使用者資料
+                cursor.execute("SELECT name, email FROM users WHERE id = %s", (user_id,))
+                current_user = cursor.fetchone()
+
+                if not current_user:
+                    return {
+                        "success": False,
+                        "message": "User not found.",
+                        "data": None
+                    }
+
+                current_name, current_email = current_user
+
+                # 比對有沒有變動
+                if (
+                    (update_data.name is None or update_data.name == current_name)
+                    and
+                    (update_data.email is None or update_data.email == current_email)
+                ):
+                    return {
+                        "success": True,
+                        "message": "No changes detected.",
+                        "data": None
+                    }
+
+                # 開始準備 update 語句
+                fields = []
+                values = []
+
+                if update_data.name is not None and update_data.name != current_name:
+                    fields.append("name = %s")
+                    values.append(update_data.name)
+
+                if update_data.email is not None and update_data.email != current_email:
+                    fields.append("email = %s")
+                    values.append(update_data.email)
+
+                values.append(user_id)
+
+                sql = f"UPDATE users SET {', '.join(fields)} WHERE id = %s"
+                cursor.execute(sql, tuple(values))
+            conn.commit()
+
+        return {
+            "success": True,
+            "message": "User info updated.",
+            "data": {
+                "name": update_data.name or current_name,
+                "email": update_data.email or current_email
+            }
+        }
+
+    except pymysql.IntegrityError as e:
+        if "Duplicate entry" in str(e):
+            return {
+                "success": False,
+                "message": "Email already exists.",
+                "data": None
+            }
+        return {
+            "success": False,
+            "message": "Database integrity error.",
             "data": None
         }

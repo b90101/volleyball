@@ -1,4 +1,4 @@
-from fastapi import FastAPI,File,Header,UploadFile,Form,Request,HTTPException,WebSocket,BackgroundTasks
+from fastapi import *
 from fastapi.responses import JSONResponse,HTMLResponse
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,8 +7,9 @@ from typing import List
 import asyncio
 
 from utils import security
-from routers import user_router
-from models.user import UserRegister , UserLogin
+from routers import user_router , team_router 
+from models.user import UserRegister , UserLogin , UserUpdate
+from models.team import TeamRegister
 
 app = FastAPI()
 
@@ -50,8 +51,8 @@ async def login(login_data: UserLogin):
 
 
 @app.get("/user")
-async def user(authorization: str = Header(None)):
-    if authorization is None or not authorization.startswith("Bearer "):
+async def user(authorization: str = Header(...)):
+    if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid or missing token")
     
     token = authorization[7:]  # 去掉 "Bearer "
@@ -65,6 +66,50 @@ async def user(authorization: str = Header(None)):
         "email": payload["email"],
     }
 
+@app.patch("/user")
+async def update_user(user_update: UserUpdate, authorization: str = Header(...)):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid token")
+
+    payload = security.verify_jwt(authorization[7:])
+    if not payload:
+        raise HTTPException(status_code=401, detail="Token expired or invalid")
+    
+    result = user_router.update(payload=payload,update_data=user_update)
+    if result["success"]:
+        return JSONResponse(status_code=200, content=result)
+    else:
+        return JSONResponse(status_code=400, content=result)
+    
+@app.post("/create_team")
+async def create_team(register_data: TeamRegister , authorization: str = Header(...)):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid token")
+    payload = security.verify_jwt(authorization[7:])
+    if not payload:
+        raise HTTPException(status_code=401, detail="Token expired or invalid")
+    result = team_router.register(payload=payload,register_data=register_data)
+    if result["success"]:
+        return JSONResponse(status_code=200, content=result)
+    else:
+        return JSONResponse(status_code=400, content=result)
+    
+@app.post("/teams/{team_id}/members")
+async def add_team_members(team_id: int,user_ids: List[int] = Body(..., embed=True),authorization: str = Header(...)):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid token")
+    
+    token = authorization[7:]
+    payload = security.verify_jwt(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Token expired or invalid")
+    
+    result = team_router.add_team_members(team_id=team_id, user_ids=user_ids, payload=payload)
+    
+    if result["success"]:
+        return result
+    else:
+        raise HTTPException(status_code=400, detail=result["message"])
 
     
 if __name__ == "__main__":  
